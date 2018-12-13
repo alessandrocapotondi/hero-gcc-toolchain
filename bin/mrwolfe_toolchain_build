@@ -1,0 +1,373 @@
+#!/bin/bash
+# Copyright (C) 2018 ETH Zurich and University of Bologna
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Authors: Alessandro Capotondi, University of Bologna (alessandro.capotondi@unibo.it)
+#
+# This script build the MRWOLFE GCC 7.1.1 toolchain
+
+
+# Error handler
+set -e
+trap 'previous_command=$this_command; this_command=$BASH_COMMAND' DEBUG
+trap 'echo $0: ERROR "$previous_command" failed at line $LINENO' ERR
+
+# Setup the envioronmental variables
+if [ -z "${MRWOLFE_TOOLCHAIN_DIR}" ]; then
+  echo >&2 "Error: missing environment variable MRWOLFE_TOOLCHAIN_DIR!"
+  exit 1
+fi
+source ${MRWOLFE_TOOLCHAIN_DIR}/env/mrwolfe_toolchain_env.sh
+
+# Local envioronmental variables definition
+MRWOLFE_PARALLEL_BUILD=
+# SYSROOT=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_HOST_TARGET}/libc
+
+
+show_help() {
+cat << EOF
+
+Usage: ${0##*/} -t <host|accel> [[-A|-S] | [-bclgs]] [-hjdx]
+
+-t <host|accel>: Specify TARGET 
+
+-A : COMPILE toolchain with accelerator support for the TARGET (host or accel).
+        > binutils
+        > all-gcc (stage 1)
+        > newlib
+        > gcc with accelerator support (stage 3)
+     
+     Note, the command is equivalent to:
+     ${0##*/} -t host|accel -bcla
+
+
+-S : COMPILE standalone toolchain for the TARGET (host or accel).
+        > binutils
+        > all-gcc (stage 1)
+        > newlib
+        > gcc (stage 2)
+
+     Note, the command is equivalent to:
+     ${0##*/} -t host|accel -bcls
+
+Advanced commands
+----------------------------------------------------
+    -b : COMPILE binutils
+    -c : COMPILE only-gcc (stage 1)    
+    -l : COMPILE newlib
+    -s : COMPILE gcc standalone (stage 2)    
+    -a : COMPILE gcc with accelerator support (stage 3)
+
+Options
+----------------------------------------------------
+    -h : display this help and exit
+    -x : REMOVE build files
+    -d : DOWNLOAD sources
+    -j : parallel make ENABLED
+
+EOF
+}
+
+get_sources() {
+    mrwolfe_toolchain_update_sources
+}
+
+#######################################################################################
+# HOST compilation functions
+#######################################################################################
+
+host_build_binutils() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/binutils
+    cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/binutils
+    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/binutils/configure --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-werror
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+host_build_newlib() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/newlib
+    cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/newlib
+    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/newlib/configure --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --enable-newlib-io-long-double --enable-newlib-io-long-long --enable-newlib-io-c99-formats 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+host_build_gcc_stage1() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage1
+    cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage1
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-shared --disable-threads --disable-tls --enable-languages=c,c++ --with-system-zlib --with-newlib --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_HOST_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_HOST_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
+    make all-gcc ${MRWOLFE_PARALLEL_BUILD}
+    make install-gcc
+
+    if [ $? -ne 0 ]; then
+        echo >&2 "ERROR: build_gcc_stage1 failed, aborting now."
+        exit 1
+    fi
+}
+
+host_build_gcc_stage2() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage2
+    cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage2
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_HOST_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_HOST_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_HOST_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+
+    if [ $? -ne 0 ]; then
+        echo >&2 "ERROR: build_gcc_stage2 failed, aborting now."
+        exit 1
+    fi
+}
+
+host_build_gcc_stage3() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage3
+    cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage3
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --enable-offload-targets=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_HOST_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
+    make all-gcc ${MRWOLFE_PARALLEL_BUILD}  
+    make all-target-libstdc++-v3 ${MRWOLFE_PARALLEL_BUILD}
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install ${MRWOLFE_PARALLEL_BUILD}
+
+    if [ $? -ne 0 ]; then
+        echo >&2 "ERROR: build_gcc_stage3 failed, aborting now."
+        exit 1
+    fi
+}
+
+
+#######################################################################################
+# ACCEL compilation functions
+#######################################################################################
+
+accel_build_binutils() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/binutils
+    cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/binutils
+    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/binutils/configure --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-werror "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+accel_build_newlib() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/newlib
+    cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/newlib
+    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/newlib/configure --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --enable-newlib-io-long-double --enable-newlib-io-long-long --enable-newlib-io-c99-formats 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+accel_build_gcc_stage1() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage1
+    cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage1
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-shared --disable-threads --disable-tls --enable-languages=c,c++ --with-system-zlib --with-newlib --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    make all-gcc ${MRWOLFE_PARALLEL_BUILD}
+    make install-gcc
+}
+
+accel_build_gcc_stage2() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage2
+    cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage2
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+ 
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+accel_build_gcc_stage3() {
+    mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage3
+    cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage3
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET}  --enable-as-accelerator-for=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}" 
+    make all ${MRWOLFE_PARALLEL_BUILD}
+    make install
+}
+
+#######################################################################################
+# Main function
+#######################################################################################
+
+mode=host
+required_field=false
+
+do_get_sources=false
+do_remove_all=false
+
+do_compile_binutils=false
+do_compile_libs=false
+do_compile_cc=false
+do_compile_gcc=false
+do_compile_gcc_with_accelerator=false
+
+while getopts t:AShbclsgxdjo opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        b)  do_compile_binutils=true
+            ;;
+        c)  do_compile_cc=true
+            ;;
+        l)  do_compile_libs=true
+            ;;            
+        s)  do_compile_gcc=true
+            ;;
+        g)  do_compile_gcc_with_accelerator=true
+            ;;
+        x)  do_remove_all=true
+            ;;
+        d)  do_get_sources=true
+            ;;
+        j)  if [ -z "${MRWOLFE_MAX_PARALLEL_BUILD_JOBS}" ]; then
+                MRWOLFE_PARALLEL_BUILD=-j`nproc`
+            else
+                MRWOLFE_PARALLEL_BUILD=-j${MRWOLFE_MAX_PARALLEL_BUILD_JOBS}
+            fi
+            ;;
+        A)  do_compile_binutils=true
+            do_compile_cc=true
+            do_compile_libs=true
+            do_compile_gcc_with_accelerator=true
+            do_compile_gcc=false
+            ;;
+        S)  do_compile_binutils=true
+            do_compile_cc=true
+            do_compile_libs=true
+            do_compile_gcc_with_accelerator=false
+            do_compile_gcc=true
+            ;;
+        o)  do_compile_libgomp=true
+            ;;
+        t)  mode=$OPTARG
+            if [[ $mode = "host" ]] || [[ $mode = "accel" ]]; then
+                required_field=true                
+            else
+                echo  >&2 "Error: -t <host|accel> must be specified"
+                show_help
+                exit 1
+            fi
+            ;;
+        \?)
+            echo >&2 "Unknown option: -$OPTARG"
+            exit 1
+            ;;
+        :)
+            echo >&2 "Missing option argument for -$OPTARG"
+            exit 1
+            ;;            
+        *)
+            show_help
+            if [[ "$_" = "$0" ]]; then
+                exit 1
+            fi
+            ;;
+    esac
+done
+
+if [[ $# -eq 0 ]] ; then
+    show_help
+    if [[ "$_" = "$0" ]]; then
+        exit 0
+    fi
+fi
+shift "$(($OPTIND - 1))"
+
+# Get sources (target is not necessary)
+if [ "$do_get_sources" = true ] ; then
+    get_sources
+fi
+
+# Remove build files (target is not necessary)
+if [ "$do_remove_all" = true ] ; then
+    rm -rf ${MRWOLFE_TOOLCHAIN_BUILD_DIR}
+fi
+
+# Build binutils
+if [ "$do_compile_binutils" = true ] ; then
+    if ! $required_field
+    then
+        echo  >&2 "Error: -t <host|accel> must be specified"
+        show_help
+        exit 1
+    fi
+
+    if [[ $mode = "host" ]]; then
+        host_build_binutils
+    else
+        accel_build_binutils
+    fi
+fi
+
+# Build gcc (stage 1)
+if [ "$do_compile_cc" = true ] ; then
+    if ! $required_field
+    then
+        echo  >&2 "Error: -t <host|accel> must be specified"
+        show_help
+        exit 1
+    fi
+
+    if [[ $mode = "host" ]]; then
+        host_build_gcc_stage1
+    else
+        accel_build_gcc_stage1
+    fi
+fi
+
+if [ "$do_compile_libs" = true ] ; then
+    if ! $required_field
+    then
+        echo  >&2 "Error: -t <host|accel> must be specified"
+        show_help
+        exit 1
+    fi
+  
+    if [[ $mode = "host" ]]; then
+        host_build_newlib
+    else
+        accel_build_newlib
+    fi
+fi
+
+# Build GCC (stage 2)
+if [ "$do_compile_gcc" = true ] ; then
+    if ! $required_field
+    then
+        echo  >&2 "Error: -t <host|accel> must be specified"
+        show_help
+        exit 1
+    fi
+
+    if [[ $mode = "host" ]]; then
+        host_build_gcc_stage2
+    else
+        accel_build_gcc_stage2
+    fi
+fi
+
+# Build GCC (stage 3)
+if [ "$do_compile_gcc_with_accelerator" = true ] ; then
+    if ! $required_field
+    then
+        echo  >&2 "Error: -t <host|accel> must be specified"
+        show_help
+        exit 1
+    fi
+  
+    if [[ $mode = "host" ]]; then
+        host_build_gcc_stage3
+    else
+        accel_build_gcc_stage3
+    fi
+fi
+
+echo "Done!"
+# That's all folks!!
