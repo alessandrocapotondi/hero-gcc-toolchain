@@ -18,13 +18,7 @@
 # Installation script for MRWOLFE GCC 7.1.1 toolchain
 
 # Setup the envioronmental variables
-if [[ ! ${MRWOLFE_TOOLCHAIN_DIR+x} ]]; then
-	if [[ ! -f "${0##*/}" ]]; then
-		echo  >&2 "Error: ${0##*/} should be launched from the directory that contains it"
-	    # exit 1
-	fi
-	export MRWOLFE_TOOLCHAIN_DIR=`readlink -f .`
-fi
+export MRWOLFE_TOOLCHAIN_DIR=`readlink -f .`
 
 source ${MRWOLFE_TOOLCHAIN_DIR}/env/mrwolfe_toolchain_env.sh
 

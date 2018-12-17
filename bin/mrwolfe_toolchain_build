@@ -132,7 +132,7 @@ host_build_gcc_stage2() {
 host_build_gcc_stage3() {
     mkdir -p ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage3
     cd ${MRWOLFE_TOOLCHAIN_HOST_GCC_BUILD_DIR}/gcc-stage3
-    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --enable-offload-targets=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_HOST_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --enable-offload-targets=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_HOST_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_HOST_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_HOST_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_HOST_ALIAS}"
     make all-gcc ${MRWOLFE_PARALLEL_BUILD}  
     make all-target-libstdc++-v3 ${MRWOLFE_PARALLEL_BUILD}
     make all ${MRWOLFE_PARALLEL_BUILD}
@@ -160,7 +160,7 @@ accel_build_binutils() {
 accel_build_newlib() {
     mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/newlib
     cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/newlib
-    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/newlib/configure --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --enable-newlib-io-long-double --enable-newlib-io-long-long --enable-newlib-io-c99-formats 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    ${MRWOLFE_TOOLCHAIN_SRC_DIR}/newlib/configure --disable-multilib --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --target=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS} --enable-newlib-io-long-double --enable-newlib-io-long-long --enable-newlib-io-c99-formats 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
     make all ${MRWOLFE_PARALLEL_BUILD}
     make install
 }
@@ -168,7 +168,7 @@ accel_build_newlib() {
 accel_build_gcc_stage1() {
     mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage1
     cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage1
-    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-shared --disable-threads --disable-tls --enable-languages=c,c++ --with-system-zlib --with-newlib --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --disable-shared --disable-threads --disable-tls --enable-languages=c,c++ --with-system-zlib --with-newlib --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} --disable-multilib 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
     make all-gcc ${MRWOLFE_PARALLEL_BUILD}
     make install-gcc
 }
@@ -176,7 +176,7 @@ accel_build_gcc_stage1() {
 accel_build_gcc_stage2() {
     mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage2
     cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage2
-    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes -with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} --disable-multilib 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}"
  
     make all ${MRWOLFE_PARALLEL_BUILD}
     make install
@@ -185,7 +185,7 @@ accel_build_gcc_stage2() {
 accel_build_gcc_stage3() {
     mkdir -p ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage3
     cd ${MRWOLFE_TOOLCHAIN_ACCEL_GCC_BUILD_DIR}/gcc-stage3
-    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET}  --enable-as-accelerator-for=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --enable-multilib --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}" 
+    ${MRWOLFE_TOOLCHAIN_GCC_SRC_DIR}/configure --build=${MRWOLFE_BUILD_TARGET} --target=${MRWOLFE_TOOLCHAIN_ACCEL_TARGET}  --enable-as-accelerator-for=${MRWOLFE_TOOLCHAIN_HOST_TARGET} --prefix=${MRWOLFE_TOOLCHAIN_INSTALL_DIR} --enable-languages=c,c++,lto --disable-shared --disable-threads --with-system-zlib --enable-tls --with-newlib --with-headers=${MRWOLFE_TOOLCHAIN_INSTALL_DIR}/${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}/include --disable-libmudflap --disable-libssp --disable-libquadmath --disable-libgomp --disable-nls --enable-checking=yes --with-abi=${MRWOLFE_TOOLCHAIN_ACCEL_ABI} --with-arch=${MRWOLFE_TOOLCHAIN_ACCEL_MARCH} --disable-multilib 'CFLAGS_FOR_TARGET=-Os -mcmodel=medlow' "target_alias=${MRWOLFE_TOOLCHAIN_ACCEL_ALIAS}" 
     make all ${MRWOLFE_PARALLEL_BUILD}
     make install
 }
@@ -206,7 +206,7 @@ do_compile_cc=false
 do_compile_gcc=false
 do_compile_gcc_with_accelerator=false
 
-while getopts t:AShbclsgxdjo opt; do
+while getopts ht:bclsaxdjASo opt; do
     case $opt in
         h)
             show_help
@@ -220,7 +220,7 @@ while getopts t:AShbclsgxdjo opt; do
             ;;            
         s)  do_compile_gcc=true
             ;;
-        g)  do_compile_gcc_with_accelerator=true
+        a)  do_compile_gcc_with_accelerator=true
             ;;
         x)  do_remove_all=true
             ;;
